@@ -6,3 +6,4 @@ frontend/.next/
 backend/app.db
 *.pyc
 venv/
+movies.db
