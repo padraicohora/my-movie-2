@@ -5,3 +5,4 @@ node_modules/
 frontend/.next/
 backend/app.db
 *.pyc
+venv/
