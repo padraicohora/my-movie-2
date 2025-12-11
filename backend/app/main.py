@@ -1,6 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import sqlite3
+from app.movies.tmdb_client import make_tmdb_request
+import pprint
+import json
 
 app = FastAPI()
 
@@ -9,6 +12,7 @@ conn = sqlite3.connect("movies.db", check_same_thread=False)
 cursor = conn.cursor()
 
 # create Tables
+# user table
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -16,6 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
 )
 """)
 
+# ratings table
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS ratings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,6 +31,7 @@ CREATE TABLE IF NOT EXISTS ratings (
 )
 """)
 
+# movies table
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS movies (
     id INTEGER PRIMARY KEY,
@@ -35,6 +41,7 @@ CREATE TABLE IF NOT EXISTS movies (
 )
 """)
 
+# commit changes to database
 conn.commit()
 
 # Pydantic models
@@ -46,6 +53,20 @@ class Rating(BaseModel):
     movie_id: int
     rating: float
 
+
+url = "/movie/now_playing?language=en-US&page=1"
+
+response = make_tmdb_request(url)
+data = response.json()
+
+
+for movie in data['results']:
+    cursor.execute(
+        "INSERT OR IGNORE INTO movies (id, title, release_date, overview) VALUES (?, ?, ?, ?)", 
+        (movie["id"], movie["title"], movie["release_date"], movie["overview"])
+    )
+
+conn.commit()  # Commit all inserts at once
 
 # API endpoints
 @app.post("/users/")
@@ -98,3 +119,18 @@ def get_ratings(user_id: int):
             "rating": r[1]
             } for r in ratings]
     }
+
+@app.get("/movies/")
+def get_movies():
+    cursor.execute("SELECT id, title, release_date, overview FROM movies")
+    movies = cursor.fetchall()
+    return [{
+        "id": m[0],
+        "title": m[1],
+        "release_date": m[2],
+        "overview": m[3]
+    } for m in movies]
+
+movies = get_movies()
+
+print(json.dumps(movies, indent=2))
